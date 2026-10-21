@@ -73,3 +73,8 @@ REQUIRED_ATTENDEE: str = os.environ.get("REQUIRED_ATTENDEE", "asi@safeshare.co.i
 # Telegram notifications
 TELEGRAM_BOT_TOKEN: str = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID: str = os.environ.get("TELEGRAM_CHAT_ID", "")
+
+# Chatwoot notes: lead-capture server's POST /chatwoot/note logs each sent message
+# in the customer's Chatwoot conversation. Optional; leave unset to disable.
+CHATWOOT_NOTE_URL: str = os.environ.get("CHATWOOT_NOTE_URL", "")
+CHATWOOT_NOTE_KEY: str = os.environ.get("CHATWOOT_NOTE_KEY", "")

@@ -59,6 +59,44 @@ def _send_request(payload: dict) -> dict:
     raise RuntimeError("Max retries exceeded for WhatsApp API")
 
 
+def _describe_payload(payload: dict) -> str:
+    """Human-readable text of a sent message, for the Chatwoot note."""
+    msg_type = payload.get("type")
+    if msg_type == "text":
+        return payload.get("text", {}).get("body", "")
+    if msg_type == "interactive":
+        return payload.get("interactive", {}).get("body", {}).get("text", "")
+    if msg_type == "template":
+        template = payload.get("template", {})
+        params = [
+            p.get("text", "")
+            for c in template.get("components", [])
+            if c.get("type") == "body"
+            for p in c.get("parameters", [])
+            if p.get("type") == "text"
+        ]
+        return f"תבנית {template.get('name', '')}: " + " | ".join(params)
+    return f"הודעה מסוג {msg_type}"
+
+
+def _log_to_chatwoot(payload: dict) -> None:
+    """Best effort: a failed note must never fail the reminder itself."""
+    if not config.CHATWOOT_NOTE_URL or not config.CHATWOOT_NOTE_KEY:
+        return
+    recipient = str(payload.get("to", ""))
+    if not recipient or recipient == config.MY_WHATSAPP_NUMBER:
+        return
+    try:
+        requests.post(
+            config.CHATWOOT_NOTE_URL,
+            json={"phone": recipient, "text": _describe_payload(payload)},
+            headers={"x-api-key": config.CHATWOOT_NOTE_KEY},
+            timeout=10,
+        )
+    except requests.exceptions.RequestException as exc:
+        logger.warning("Chatwoot note failed for %s: %s", recipient, exc)
+
+
 def send_interactive_message(payload: dict) -> str:
     """Send an interactive button message. Returns the WhatsApp message ID."""
     result = _send_request(payload)
@@ -66,6 +104,7 @@ def send_interactive_message(payload: dict) -> str:
     if messages:
         msg_id = messages[0].get("id", "")
         logger.info("Interactive message sent, id=%s", msg_id)
+        _log_to_chatwoot(payload)
         return msg_id
     logger.warning("No message ID in response: %s", result)
     return ""
@@ -78,6 +117,7 @@ def send_text_message(payload: dict) -> str:
     if messages:
         msg_id = messages[0].get("id", "")
         logger.info("Text message sent, id=%s", msg_id)
+        _log_to_chatwoot(payload)
         return msg_id
     logger.warning("No message ID in response: %s", result)
     return ""
